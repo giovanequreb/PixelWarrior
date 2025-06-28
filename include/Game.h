@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <list>
+#include <SDL_ttf.h>
 
 #include "TextureManager.h"
 #include "Player.h"
@@ -38,6 +39,7 @@ private:
     void spawnEnemies();
     void updateCollisions();
     void renderBackground();
+    void showLoadingScreen();
 
     SDL_Window* window;
     SDL_Renderer* renderer;

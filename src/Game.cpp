@@ -1,5 +1,6 @@
 #include "../include/Game.h"
 #include "../include/Constants.h"
+#include <SDL_ttf.h>
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
@@ -16,9 +17,74 @@ Game::~Game() {
     cleanup();
 }
 
+// ========== FUNZIONE MODIFICATA: SCHERMATA DI CARICAMENTO ==========
+void Game::showLoadingScreen() {
+    // --- MODIFICA: Nessuna immagine di sfondo viene caricata ---
+
+    // Carica il font, con una dimensione maggiore
+    TTF_Font* font = TTF_OpenFont("/Users/adamkouribiy/Desktop/VGAMES/PixelWarrior/assets/fonts/pixel_font.ttf", 40); // Dimensione aumentata a 40
+    if (!font) {
+        std::cerr << "Impossibile caricare il font: " << TTF_GetError() << std::endl;
+        running = false;
+        return;
+    }
+
+    // Crea la texture del testo
+    SDL_Color textColor = { 255, 255, 255, 255 }; // Colore bianco
+    SDL_Surface* textSurface = TTF_RenderText_Blended(font, "Press Space to start the game", textColor);
+    SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+
+    // Posiziona il testo in basso al centro
+    SDL_Rect textRect;
+    textRect.w = textSurface->w;
+    textRect.h = textSurface->h;
+    textRect.x = (800 - textRect.w) / 2;
+    textRect.y = 600 - textRect.h - 60; // Un po' più in alto per via del testo più grande
+
+    SDL_FreeSurface(textSurface);
+    TTF_CloseFont(font);
+
+    // Ciclo di attesa della schermata di caricamento
+    bool waitingForInput = true;
+    SDL_Event event;
+
+    while (waitingForInput && running) {
+        while (SDL_PollEvent(&event) != 0) {
+            if (event.type == SDL_QUIT) {
+                running = false;
+            }
+            if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_SPACE) {
+                    waitingForInput = false;
+                }
+            }
+        }
+
+        // --- MODIFICA: Disegna lo sfondo viola ---
+        SDL_SetRenderDrawColor(renderer, 75, 0, 130, 255); // Viola (Indigo)
+        SDL_RenderClear(renderer);
+
+        // Disegna solo il testo
+        SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
+        SDL_RenderPresent(renderer);
+
+        SDL_Delay(16);
+    }
+
+    // Pulisci solo la texture del testo
+    SDL_DestroyTexture(textTexture);
+}
+// ====================================================================
+
 bool Game::initialize() {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) { std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl; return false; }
     if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) { std::cerr << "IMG_Init Error: " << IMG_GetError() << std::endl; return false; }
+    
+    if (TTF_Init() == -1) {
+        std::cerr << "TTF_Init Error: " << TTF_GetError() << std::endl;
+        return false;
+    }
+
     srand(time(nullptr));
     window = SDL_CreateWindow("Pixel Warrior", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_SHOWN);
     if (!window) { std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl; return false; }
@@ -70,7 +136,6 @@ bool Game::initialize() {
 }
 
 bool Game::loadMedia() {
-    // --- SFONDO EMBRIONALE ---
     backgroundSky = IMG_LoadTexture(renderer, "assets/Background/blue/BG_sky.png");
     backgroundMountains = IMG_LoadTexture(renderer, "assets/Background/blue/layer_01.png");
     backgroundClouds = IMG_LoadTexture(renderer, "assets/Background/blue/layer_02.png");
@@ -99,6 +164,8 @@ bool Game::loadMedia() {
 }
 
 void Game::run() {
+    showLoadingScreen();
+
     const int frameDelay = 1000 / 60;
     Uint32 frameStart;
     int frameTime;
@@ -232,19 +299,15 @@ void Game::render() {
 }
 
 void Game::renderBackground() {
-    // --- SFONDO EMBRIONALE PARALLAX ---
-    // Cielo (fermo)
     SDL_Rect dest = {0, 0, 800, 600};
     SDL_RenderCopy(renderer, backgroundSky, NULL, &dest);
 
-    // Montagne (parallax lento)
     int offsetMountains = (int)(gameCamera->getX() * 0.2f) % 800;
     SDL_Rect destMountains1 = { -offsetMountains, 0, 800, 600 };
     SDL_Rect destMountains2 = { -offsetMountains + 800, 0, 800, 600 };
     SDL_RenderCopy(renderer, backgroundMountains, NULL, &destMountains1);
     SDL_RenderCopy(renderer, backgroundMountains, NULL, &destMountains2);
 
-    // Nuvole (parallax più veloce)
     int offsetClouds = (int)(gameCamera->getX() * 0.4f) % 800;
     SDL_Rect destClouds1 = { -offsetClouds, 0, 800, 600 };
     SDL_Rect destClouds2 = { -offsetClouds + 800, 0, 800, 600 };
@@ -263,6 +326,9 @@ void Game::cleanup() {
     delete texManager;
     if (renderer) SDL_DestroyRenderer(renderer);
     if (window) SDL_DestroyWindow(window);
+    
+    TTF_Quit();
+    
     IMG_Quit();
     SDL_Quit();
 }
